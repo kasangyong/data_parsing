@@ -18,6 +18,8 @@ from fastapi.staticfiles import StaticFiles
 
 from . import database as db
 from . import graph as graph_builder
+from . import kg_builder
+from . import kg_database as kgdb
 from . import search as search_engine
 from .config import DATA_DIR, IMAGE_DIR, PDF_DIR, STATIC_DIR
 from .embeddings import ModelNotReadyError, models_ready
@@ -41,6 +43,7 @@ logger.info("데이터 디렉터리: %s", DATA_DIR)
 
 # DB 초기화 (서버 기동 시 1회)
 db.init_db()
+kgdb.init_kg_db()
 
 # 정적 파일 서빙
 app.mount("/images", StaticFiles(directory=IMAGE_DIR), name="images")
@@ -155,6 +158,57 @@ def get_graph(
         max_edges_per_node=max_edges,
     )
     return builder.build()
+
+
+# ---------------------------------------------------------------------------
+# 엔티티 지식 그래프 (온톨로지 기반 — entities/relations)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/kg/graph")
+def get_entity_graph(
+    min_confidence: float = Query(0.3, ge=0.0, le=1.0,
+                                  description="관계 신뢰도 임계값"),
+    max_nodes: int = Query(150, ge=10, le=500, description="최대 노드 수"),
+):
+    """엔티티 그래프 (노드 = 엔티티, 엣지 = 온톨로지 관계)."""
+    return kg_builder.get_entity_graph(min_confidence=min_confidence,
+                                       max_nodes=max_nodes)
+
+
+@app.get("/api/kg/stats")
+def get_kg_stats():
+    """엔티티/관계 통계 (타입별 분포 포함)."""
+    kgdb.init_kg_db()
+    return kgdb.kg_stats()
+
+
+@app.get("/api/kg/entity/{entity_id}")
+def get_entity_detail(entity_id: int):
+    """엔티티 상세 — 출처(멘션) 목록."""
+    kgdb.init_kg_db()
+    mentions = kgdb.get_entity_mentions(entity_id)
+    if not mentions:
+        # 엔티티는 있으나 멘션이 없을 수도 있으므로 존재 여부를 별도 확인
+        entities = {e["id"]: e for e in kgdb.list_entities()}
+        if entity_id not in entities:
+            raise HTTPException(status_code=404, detail="엔티티를 찾을 수 없습니다.")
+    return {"entity_id": entity_id, "mentions": mentions}
+
+
+@app.post("/api/kg/build")
+def build_kg(use_gliner: bool = Query(True, description="GLiNER 본문 추출 사용")):
+    """전체 문서에서 엔티티 지식 그래프를 재구축한다."""
+    report = kg_builder.build_knowledge_graph(use_gliner=use_gliner)
+    return {
+        "documents": report.documents,
+        "entities": report.entities,
+        "mentions": report.mentions,
+        "relations": report.relations,
+        "violations": report.violations,
+        "merged": report.merged,
+        "used_gliner": report.used_gliner,
+        "warnings": report.warnings,
+    }
 
 
 # ---------------------------------------------------------------------------

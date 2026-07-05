@@ -11,6 +11,16 @@ pdfsearch CLI — git처럼 어느 폴더에서든 쓰는 PDF 검색 도구.
     pdfsearch status                # 현재 프로젝트 상태
     pdfsearch serve                 # 웹 UI 실행 (현재 프로젝트 데이터)
 
+    # 온톨로지 기반 지식 그래프 (엔티티/관계)
+    pdfsearch kg build              # 전체 문서 → 엔티티 그래프 재구축
+    pdfsearch kg stats              # 엔티티/관계 통계
+    pdfsearch kg ontology           # 프로젝트 온톨로지 확장 템플릿 생성
+
+    # 추출 품질 평가 하네스
+    pdfsearch harness init          # 골든셋 폴더/템플릿 생성
+    pdfsearch harness run [--gate]  # F1/ECE/회귀 검사 (게이트 시 회귀면 exit 3)
+    pdfsearch harness baseline      # 현재 결과를 기준선으로 저장
+
 동작 원리:
     명령 실행 위치에서 상위로 올라가며 `.pdfsearch/` 폴더를 찾는다 (git 방식).
     찾은 폴더가 곧 "현재 프로젝트"이며 DB/인덱스/파일이 모두 그 안에 저장된다.
@@ -319,6 +329,132 @@ def cmd_serve(args) -> int:
 
 
 # ---------------------------------------------------------------------------
+# kg — 온톨로지 기반 지식 그래프
+# ---------------------------------------------------------------------------
+
+def cmd_kg(args) -> int:
+    _require_project()
+    from .database import init_db
+    init_db()
+
+    action = args.kg_command
+    if action == "build":
+        from .kg_builder import build_knowledge_graph
+        print("지식 그래프 구축 중… (문서 수에 따라 시간이 걸립니다)")
+        report = build_knowledge_graph(use_gliner=not args.no_gliner)
+        print("\n" + "=" * 60)
+        print("지식 그래프 구축 완료")
+        print("=" * 60)
+        print(f"  문서:        {report.documents}")
+        print(f"  엔티티:      {report.entities}  (병합 {report.merged})")
+        print(f"  멘션:        {report.mentions}")
+        print(f"  관계:        {report.relations}  (온톨로지 위반 거부 {report.violations})")
+        print(f"  GLiNER 사용: {'예' if report.used_gliner else '아니오'}")
+        for w in report.warnings:
+            print(f"  [경고] {w}")
+        return 0
+
+    if action == "stats":
+        from . import kg_database as kgdb
+        kgdb.init_kg_db()
+        s = kgdb.kg_stats()
+        if not s["entities"]:
+            print("아직 지식 그래프가 없습니다.  pdfsearch kg build 를 먼저 실행하세요.")
+            return 0
+        print(f"엔티티 {s['entities']} · 멘션 {s['mentions']} · 관계 {s['relations']}\n")
+        print("엔티티 타입별:")
+        for t, c in s["entities_by_type"].items():
+            print(f"  {t:<14} {c}")
+        print("\n관계 타입별:")
+        for t, c in s["relations_by_type"].items():
+            print(f"  {t:<14} {c}")
+        return 0
+
+    if action == "ontology":
+        from .config import DATA_DIR
+        from .ontology import ONTOLOGY_TEMPLATE
+        path = Path(DATA_DIR) / "ontology.yaml"
+        if path.exists() and not args.force:
+            print(f"이미 존재합니다: {path}")
+            print("덮어쓰려면 --force 를 사용하세요.")
+            return 0
+        path.write_text(ONTOLOGY_TEMPLATE, encoding="utf-8")
+        print(f"온톨로지 템플릿 생성: {path}")
+        print("이 파일에 프로젝트 전용 엔티티/관계 타입을 추가하면 base 온톨로지에 병합됩니다.")
+        return 0
+
+    print("사용법: pdfsearch kg {build|stats|ontology}")
+    return 1
+
+
+# ---------------------------------------------------------------------------
+# harness — 추출 품질 평가
+# ---------------------------------------------------------------------------
+
+def cmd_harness(args) -> int:
+    _require_project()
+    from .harness import Harness
+
+    h = Harness()
+    action = args.harness_command
+
+    if action == "init":
+        path = h.init_scaffold()
+        print(f"골든셋 폴더 생성: {path}")
+        print(f"예시 템플릿: {path / '_example.json.template'}")
+        print("정답 JSON을 이 폴더에 추가한 뒤:  pdfsearch harness run")
+        return 0
+
+    if action == "run":
+        report = h.run()
+        print("=" * 60)
+        print(f"하네스 실행 결과  ({report.timestamp})")
+        print("=" * 60)
+        for w in report.warnings:
+            print(f"[경고] {w}")
+        gq = report.graph_quality
+        print(f"\n[그래프 품질]  엔티티 {gq.get('entities', 0)} · "
+              f"관계 {gq.get('relations', 0)} · "
+              f"고아노드 비율 {gq.get('orphan_node_ratio', 0):.2f} · "
+              f"평균차수 {gq.get('avg_degree', 0):.2f}")
+
+        if report.documents_evaluated:
+            es, ep = report.entity_strict, report.entity_partial
+            r = report.relation
+            print(f"\n[평가 문서 {report.documents_evaluated}개]")
+            print(f"  엔티티 F1 (엄격):   {es.get('f1', 0):.3f}  "
+                  f"(P {es.get('precision', 0):.3f} / R {es.get('recall', 0):.3f})")
+            print(f"  엔티티 F1 (부분):   {ep.get('f1', 0):.3f}  "
+                  f"(P {ep.get('precision', 0):.3f} / R {ep.get('recall', 0):.3f})")
+            print(f"  관계 F1:            {r.get('f1', 0):.3f}  "
+                  f"(P {r.get('precision', 0):.3f} / R {r.get('recall', 0):.3f})")
+            print(f"  ECE (신뢰도 보정):  {report.ece:.3f}")
+            if report.entity_by_type:
+                print("\n  타입별 F1 (부분일치):")
+                for t, v in sorted(report.entity_by_type.items(),
+                                   key=lambda kv: -kv[1].get("f1", 0)):
+                    print(f"    {t:<14} {v.get('f1', 0):.3f}")
+
+        # 회귀 게이트
+        ok, msg = h.check_regression(report)
+        print("\n[회귀 검사]")
+        print(msg)
+        if args.gate and not ok:
+            print("\n회귀가 감지되어 실패로 종료합니다 (exit 3).")
+            return 3
+        return 0
+
+    if action == "baseline":
+        report = h.run()
+        h.save_baseline(report)
+        print(f"현재 결과를 기준(baseline)으로 저장했습니다: {h.baseline_path}")
+        return 0
+
+    print("사용법: pdfsearch harness {init|run|baseline}")
+    return 1
+
+
+# ---------------------------------------------------------------------------
 # 엔트리포인트
 # ---------------------------------------------------------------------------
 
@@ -357,6 +493,27 @@ def main() -> int:
     p_serve.add_argument("--port", type=int, default=8000)
     p_serve.add_argument("--reload", action="store_true", help="코드 변경 시 자동 재시작")
     p_serve.set_defaults(func=cmd_serve)
+
+    # ----- kg: 온톨로지 기반 지식 그래프 -----
+    p_kg = sub.add_parser("kg", help="온톨로지 기반 지식 그래프 (엔티티/관계)")
+    kg_sub = p_kg.add_subparsers(dest="kg_command")
+    p_kg_build = kg_sub.add_parser("build", help="전체 문서에서 지식 그래프 재구축")
+    p_kg_build.add_argument("--no-gliner", action="store_true",
+                            help="GLiNER 본문 추출 생략 (구조/정규식만)")
+    kg_sub.add_parser("stats", help="엔티티/관계 통계")
+    p_kg_onto = kg_sub.add_parser("ontology", help="프로젝트 온톨로지 확장 템플릿 생성")
+    p_kg_onto.add_argument("--force", action="store_true", help="기존 파일 덮어쓰기")
+    p_kg.set_defaults(func=cmd_kg, kg_command=None, no_gliner=False, force=False)
+
+    # ----- harness: 추출 품질 평가 -----
+    p_h = sub.add_parser("harness", help="추출 품질 평가 (골든셋/F1/ECE/회귀게이트)")
+    h_sub = p_h.add_subparsers(dest="harness_command")
+    h_sub.add_parser("init", help="골든셋 폴더 + 예시 템플릿 생성")
+    p_h_run = h_sub.add_parser("run", help="평가 실행 + 회귀 검사")
+    p_h_run.add_argument("--gate", action="store_true",
+                         help="회귀 시 실패 코드(3) 반환 (CI 게이트)")
+    h_sub.add_parser("baseline", help="현재 결과를 기준선으로 저장")
+    p_h.set_defaults(func=cmd_harness, harness_command=None, gate=False)
 
     args = parser.parse_args()
     if not args.command:

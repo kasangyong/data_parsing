@@ -26,6 +26,7 @@ function showView(name) {
   );
   if (name === "documents") loadDocuments();
   if (name === "graph") graphView.load();
+  if (name === "entities") entityGraphView.load();
 }
 
 // ===== 모델 상태 =====
