@@ -1,0 +1,17 @@
+# PDF parsing
+PyMuPDF>=1.24.0
+pdfplumber>=0.11.0
+
+# Embeddings (models are downloaded via download_models.py)
+sentence-transformers>=3.0.0
+torch>=2.0.0
+Pillow>=10.0.0
+
+# Vector search
+faiss-cpu>=1.8.0
+numpy>=1.24.0
+
+# Web server
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9

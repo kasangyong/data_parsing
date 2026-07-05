@@ -1,0 +1,23 @@
+# 가상환경
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# 데이터 (업로드 파일, DB, 인덱스)
+storage/
+.pdfsearch/
+
+# 다운로드된 모델
+models/
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

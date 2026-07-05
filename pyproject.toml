@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdfsearch"
+version = "1.0.0"
+description = "PDF 멀티모달 검색 엔진 — 프로젝트 폴더별 독립 DB (git처럼 동작하는 CLI)"
+requires-python = ">=3.10"
+dependencies = [
+    # PDF parsing
+    "PyMuPDF>=1.24.0",
+    "pdfplumber>=0.11.0",
+    # Embeddings (models are downloaded via `pdfsearch models`)
+    "sentence-transformers>=3.0.0",
+    "torch>=2.0.0",
+    "Pillow>=10.0.0",
+    # Vector search
+    "faiss-cpu>=1.8.0",
+    "numpy>=1.24.0",
+    # Web server
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.scripts]
+pdfsearch = "pdfsearch.cli:main"
+
+[tool.setuptools]
+packages = ["pdfsearch"]
+
+[tool.setuptools.package-data]
+pdfsearch = ["static/*"]

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF 멀티모달 검색</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- 글로벌 내비게이션 (black, 44px) -->
+  <nav class="global-nav">
+    <span class="global-nav-brand" onclick="showView('search')">PDF Search</span>
+    <div class="global-nav-links">
+      <a href="#" onclick="showView('search');return false;">검색</a>
+      <a href="#" onclick="showView('upload');return false;">업로드</a>
+      <a href="#" onclick="showView('documents');return false;">문서</a>
+    </div>
+  </nav>
+
+  <!-- 서브 내비게이션 (frosted, 52px) -->
+  <div class="sub-nav">
+    <span class="sub-nav-title" onclick="showView('search')">PDF 멀티모달 검색</span>
+    <div class="sub-nav-actions">
+      <button class="nav-btn" data-view="search" onclick="showView('search')">검색</button>
+      <button class="nav-btn" data-view="upload" onclick="showView('upload')">업로드</button>
+      <button class="nav-btn" data-view="documents" onclick="showView('documents')">문서 목록</button>
+      <div id="model-status" class="model-status"></div>
+    </div>
+  </div>
+
+  <main>
+
+    <!-- ===== 검색 뷰 ===== -->
+    <section id="view-search" class="view">
+      <div class="hero-tile">
+        <h1 class="hero-headline">찾고 싶은 모든 것.</h1>
+        <p class="hero-lead">텍스트, 이미지, 표까지. 자연어 하나로 검색하세요.</p>
+        <form id="search-form" class="search-box">
+          <input type="text" id="search-input" class="search-input"
+                 placeholder="예: 매출 그래프, 고양이 사진…" autocomplete="off" />
+          <select id="search-type" class="search-select">
+            <option value="all">전체</option>
+            <option value="text">텍스트</option>
+            <option value="image">이미지</option>
+            <option value="table">표</option>
+            <option value="annotation">주석</option>
+          </select>
+          <button type="submit" class="button-primary">검색</button>
+        </form>
+      </div>
+      <div class="container">
+        <div id="search-results" class="results"></div>
+      </div>
+    </section>
+
+    <!-- ===== 업로드 뷰 ===== -->
+    <section id="view-upload" class="view hidden">
+      <div class="section-tile">
+        <h2 class="display-lg">PDF 업로드.</h2>
+        <p class="lead-copy">드래그 앤 드롭 한 번이면 파싱과 인덱싱까지.</p>
+      </div>
+      <div class="container">
+        <div id="drop-zone" class="drop-zone">
+          <p>PDF 파일을 여기에 드래그하거나 클릭해서 선택하세요</p>
+          <input type="file" id="file-input" accept=".pdf" hidden />
+        </div>
+        <div id="upload-status" class="upload-status"></div>
+      </div>
+    </section>
+
+    <!-- ===== 문서 목록 뷰 ===== -->
+    <section id="view-documents" class="view hidden">
+      <div class="section-tile">
+        <h2 class="display-lg">문서 목록.</h2>
+        <p class="lead-copy">업로드된 모든 PDF를 한눈에.</p>
+      </div>
+      <div class="container">
+        <div id="documents-list" class="documents-list"></div>
+      </div>
+    </section>
+
+    <!-- ===== 문서 요약 뷰 ===== -->
+    <section id="view-summary" class="view hidden">
+      <div class="container summary-container">
+        <button class="back-btn" onclick="showView('search')">← 돌아가기</button>
+        <div id="summary-content"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <p>PDF 멀티모달 검색 엔진 — 텍스트 · 이미지 · 표를 의미 기반으로 검색합니다.</p>
+    <p class="footer-legal">전부 로컬에서 실행됩니다. 데이터는 외부로 전송되지 않습니다.</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
