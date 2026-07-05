@@ -532,6 +532,114 @@ code {
   font-size: 0.88em;
 }
 
+/* ===== 지식 그래프 ===== */
+.graph-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-md);
+  flex-wrap: wrap;
+}
+.graph-toolbar label {
+  font-size: 14px;
+  color: var(--ink-muted-80);
+  letter-spacing: -0.224px;
+}
+.graph-toolbar input[type="range"] {
+  width: 160px;
+  accent-color: var(--primary);
+}
+.graph-status {
+  font-size: 13px;
+  color: var(--ink-muted-48);
+  letter-spacing: -0.208px;
+}
+
+.graph-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-xl);
+}
+.graph-canvas {
+  width: 100%;
+  height: 620px;
+  background: var(--canvas-parchment);
+  border-radius: var(--r-lg);
+  display: block;
+}
+.graph-panel {
+  background: var(--surface-pearl);
+  border: 1px solid var(--divider-soft);
+  border-radius: var(--r-lg);
+  padding: var(--sp-lg);
+  height: 620px;
+  overflow-y: auto;
+}
+.graph-panel-empty p {
+  font-size: 14px;
+  color: var(--ink-muted-80);
+  line-height: 1.6;
+  margin-bottom: var(--sp-sm);
+}
+.graph-panel-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.2px;
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+.graph-panel-sub {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  margin: var(--sp-md) 0 var(--sp-xs);
+}
+.graph-panel-muted {
+  font-size: 13px;
+  color: var(--ink-muted-48);
+  letter-spacing: -0.208px;
+}
+.graph-conn {
+  padding: var(--sp-sm) 0;
+  border-bottom: 1px solid var(--divider-soft);
+}
+.graph-conn:last-of-type { border-bottom: none; }
+.graph-conn-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-xs);
+}
+.graph-conn-name {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.224px;
+  word-break: break-all;
+}
+.graph-conn-kw {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-muted-48);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.graph-conn-kw .chip { font-size: 11px; padding: 2px 8px; }
+.graph-panel-btn {
+  width: 100%;
+  margin-top: var(--sp-md);
+}
+
+@media (max-width: 900px) {
+  .graph-layout { grid-template-columns: 1fr; }
+  .graph-canvas { height: 440px; }
+  .graph-panel { height: auto; max-height: 400px; }
+}
+
 /* ===== 푸터 (parchment) ===== */
 .footer {
   background: var(--canvas-parchment);

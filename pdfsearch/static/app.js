@@ -25,6 +25,7 @@ function showView(name) {
     b.classList.toggle("active", b.dataset.view === name)
   );
   if (name === "documents") loadDocuments();
+  if (name === "graph") graphView.load();
 }
 
 // ===== 모델 상태 =====

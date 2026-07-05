@@ -15,6 +15,7 @@
       <a href="#" onclick="showView('search');return false;">검색</a>
       <a href="#" onclick="showView('upload');return false;">업로드</a>
       <a href="#" onclick="showView('documents');return false;">문서</a>
+      <a href="#" onclick="showView('graph');return false;">그래프</a>
     </div>
   </nav>
 
@@ -25,6 +26,7 @@
       <button class="nav-btn" data-view="search" onclick="showView('search')">검색</button>
       <button class="nav-btn" data-view="upload" onclick="showView('upload')">업로드</button>
       <button class="nav-btn" data-view="documents" onclick="showView('documents')">문서 목록</button>
+      <button class="nav-btn" data-view="graph" onclick="showView('graph')">지식 그래프</button>
       <div id="model-status" class="model-status"></div>
     </div>
   </div>
@@ -80,6 +82,27 @@
       </div>
     </section>
 
+    <!-- ===== 지식 그래프 뷰 ===== -->
+    <section id="view-graph" class="view hidden">
+      <div class="section-tile">
+        <h2 class="display-lg">지식 그래프.</h2>
+        <p class="lead-copy">문서들이 어떻게 연결되어 있는지 한눈에.</p>
+      </div>
+      <div class="container">
+        <div class="graph-toolbar">
+          <label for="graph-threshold">연결 민감도</label>
+          <input type="range" id="graph-threshold" min="0.1" max="0.8" step="0.05" value="0.35"
+                 onchange="graphView.load(true)" />
+          <button class="button-primary" onclick="graphView.load(true)">다시 계산</button>
+          <span id="graph-status" class="graph-status"></span>
+        </div>
+        <div class="graph-layout">
+          <canvas id="graph-canvas" class="graph-canvas"></canvas>
+          <aside id="graph-panel" class="graph-panel"></aside>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== 문서 요약 뷰 ===== -->
     <section id="view-summary" class="view hidden">
       <div class="container summary-container">
@@ -95,6 +118,7 @@
     <p class="footer-legal">전부 로컬에서 실행됩니다. 데이터는 외부로 전송되지 않습니다.</p>
   </footer>
 
+  <script src="/static/graph.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import database as db
+from . import graph as graph_builder
 from . import search as search_engine
 from .config import DATA_DIR, IMAGE_DIR, PDF_DIR, STATIC_DIR
 from .embeddings import ModelNotReadyError, models_ready
@@ -137,6 +138,23 @@ def search(
         raise ModelNotReadyError()
     results = search_engine.search(q.strip(), search_type=type)
     return {"query": q, "type": type, "count": len(results), "results": results}
+
+
+# ---------------------------------------------------------------------------
+# 지식 그래프
+# ---------------------------------------------------------------------------
+
+@app.get("/api/graph")
+def get_graph(
+    threshold: float = Query(0.35, ge=0.0, le=1.0, description="엣지 유사도 임계값"),
+    max_edges: int = Query(4, ge=1, le=20, description="노드당 최대 엣지 수"),
+):
+    """문서 지식 그래프 (노드 = 문서, 엣지 = 의미 유사도 + 공유 키워드)."""
+    builder = graph_builder.KnowledgeGraphBuilder(
+        similarity_threshold=threshold,
+        max_edges_per_node=max_edges,
+    )
+    return builder.build()
 
 
 # ---------------------------------------------------------------------------
