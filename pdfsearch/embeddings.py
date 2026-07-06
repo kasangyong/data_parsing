@@ -44,9 +44,14 @@ class ModelNotReadyError(RuntimeError):
 # ---------------------------------------------------------------------------
 
 def _hf_cache_dir_for(model_name: str) -> Path:
-    """HuggingFace 캐시 디렉터리 경로 계산. 예: models/hub/models--org--name"""
+    """HuggingFace 캐시 디렉터리 경로 계산. 예: models/models--org--name
+
+    SentenceTransformer(..., cache_folder=MODELS_DIR)로 받으면 huggingface_hub가
+    저장소를 MODELS_DIR 바로 아래에 두므로 (HF_HOME 기본 레이아웃의 `hub/` 중간
+    폴더는 붙지 않음), 여기서도 같은 경로로 확인해야 한다.
+    """
     safe = model_name.replace("/", "--")
-    return MODELS_DIR / "hub" / f"models--{safe}"
+    return MODELS_DIR / f"models--{safe}"
 
 
 def _is_model_cached(model_name: str) -> bool:

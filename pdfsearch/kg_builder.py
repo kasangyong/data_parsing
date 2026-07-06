@@ -237,6 +237,12 @@ class KGBuilder:
                 for k in remaining:
                     by_type[k[1]].append(k)
                 for etype, group in by_type.items():
+                    if etype == "Document":
+                        # 문서 자기-엔티티(파일명)는 절대 의미 유사도로 병합하면
+                        # 안 된다. 같은 명명 규칙("서울_3반_이름_학번.pdf")을 쓰는
+                        # 서로 다른 문서들은 문자열이 비슷해 임베딩 유사도가
+                        # 0.97+ 로 나오지만 실제로는 완전히 다른 문서다.
+                        continue
                     if len(group) < 2 or len(group) > 400:
                         continue  # 너무 크면 O(n^2) 회피
                     vecs = embed_texts([k[0] for k in group])

@@ -137,6 +137,34 @@ _HYPHEN_BREAK_RE = re.compile(r"(?<=[A-Za-z])-\n(?=[a-z])")
 _SENT_END_RE = re.compile(r"[.!?。:;)\]」』〉》다]['\"”’)]*\s*$")
 
 
+_GARBLED_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+def _looks_garbled(text: str) -> bool:
+    """폰트 ToUnicode 매핑이 깨진 PDF에서 뽑힌 텍스트인지 휴리스틱으로 판단.
+
+    일부 PDF는 서브셋 폰트에 올바른 문자 매핑이 없어 PyMuPDF가 제어문자/
+    사용 불가 영역 코드로 텍스트를 뽑아낸다. 이 경우 글자 수는 충분해도
+    실제 내용이 아니므로, 길이 기준만으로는 OCR로 넘어가지 않는다.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return False
+    bad = len(_GARBLED_CHAR_RE.findall(stripped))
+    return (bad / len(stripped)) > 0.02
+
+
+# 자간(트래킹)이 넓은 인포그래픽 폰트에서 글자가 하나씩 떨어져 나오는 문제:
+# 알파벳/숫자 단일 문자가 공백으로 3개 이상 연속되면 원래 한 단어였을 가능성이 높음
+# (정상적인 영문 산문은 이런 패턴을 거의 만들지 않음). 한글은 "1 차 2 차"처럼
+# 정상적인 열거 표현과 구분이 안 되므로 대상에서 제외.
+_TRACKED_RUN_RE = re.compile(r"(?<!\w)(?:[A-Za-z0-9] ){2,}[A-Za-z0-9](?!\w)")
+
+
+def _collapse_letter_tracking(text: str) -> str:
+    return _TRACKED_RUN_RE.sub(lambda m: m.group(0).replace(" ", ""), text)
+
+
 def _normalize_text(text: str) -> str:
     """페이지 원문 정규화 — 청킹/임베딩 전 노이즈 제거."""
     # 1) 유니코드 정규화: 리가처(ﬁ→fi), 전각→반각 등
@@ -457,7 +485,7 @@ _TABLE_STRATEGIES = [
     {"vertical_strategy": "lines", "horizontal_strategy": "lines",
      "snap_tolerance": 4, "join_tolerance": 4},
     {"vertical_strategy": "text", "horizontal_strategy": "text",
-     "snap_tolerance": 4, "intersection_tolerance": 6},
+     "snap_tolerance": 4, "intersection_tolerance": 6, "min_words_vertical": 5},
 ]
 
 
@@ -624,17 +652,23 @@ def parse_pdf(pdf_path: str | Path, document_key: str) -> ParseResult:
         try:
             raw_text = page.get_text("text")
             source = "native"
-            if (len(raw_text.strip()) < OCR_TEXT_THRESHOLD
-                    and result.ocr_available):
+            was_garbled = _looks_garbled(raw_text)
+            if (len(raw_text.strip()) < OCR_TEXT_THRESHOLD or was_garbled) \
+                    and result.ocr_available:
                 try:
                     ocr_text = _ocr_page(page)
-                    if len(ocr_text.strip()) > len(raw_text.strip()):
+                    if ocr_text.strip() and (
+                            was_garbled
+                            or len(ocr_text.strip()) > len(raw_text.strip())):
                         raw_text = ocr_text
                         source = "ocr"
                         result.ocr_pages.append(page_no)
                 except Exception as e:
                     result.errors.append(f"p{page_no} OCR 실패: {e}")
-            page_texts.append((page_no, _normalize_text(raw_text), source))
+            normalized = _normalize_text(raw_text)
+            if source == "native":
+                normalized = _collapse_letter_tracking(normalized)
+            page_texts.append((page_no, normalized, source))
         except Exception as e:
             result.errors.append(f"p{page_no} 텍스트 추출 실패: {e}")
 
@@ -643,16 +677,40 @@ def parse_pdf(pdf_path: str | Path, document_key: str) -> ParseResult:
             seen_xrefs: set[int] = set()
             for img_idx, img_info in enumerate(page.get_images(full=True)):
                 xref = img_info[0]
+                smask_xref = img_info[1] if len(img_info) > 1 else 0
                 if xref in seen_xrefs:
                     continue
                 seen_xrefs.add(xref)
                 try:
-                    extracted = doc.extract_image(xref)
-                    pil = Image.open(io.BytesIO(extracted["image"]))
+                    pil = None
+                    if smask_xref:
+                        # SMask(투명도 마스크)가 있는 이미지: 마스크를 합성하지 않으면
+                        # 아이콘의 채우기 색(주로 검정)만 남아 새까만 사각형으로 보인다.
+                        # 색상 이미지와 마스크의 해상도가 다른 경우가 흔해서(예: 단색
+                        # 채우기용 2x2 이미지 + 훨씬 큰 해상도의 모양 마스크) PIL에서
+                        # 필요시 리사이즈한 뒤 알파 채널로 적용한다.
+                        try:
+                            extracted = doc.extract_image(xref)
+                            base_pil = Image.open(io.BytesIO(extracted["image"])).convert("RGB")
+                            mask_pix = fitz.Pixmap(doc, smask_xref)
+                            mask_pil = Image.open(io.BytesIO(mask_pix.tobytes("png"))).convert("L")
+                            if base_pil.size != mask_pil.size:
+                                base_pil = base_pil.resize(mask_pil.size, Image.BILINEAR)
+                            base_pil.putalpha(mask_pil)
+                            pil = base_pil
+                        except Exception:
+                            pil = None
+                    if pil is None:
+                        extracted = doc.extract_image(xref)
+                        pil = Image.open(io.BytesIO(extracted["image"]))
                     w, h = pil.size
                     if w < MIN_IMAGE_SIZE or h < MIN_IMAGE_SIZE:
                         continue
-                    if pil.mode not in ("RGB", "L"):
+                    if pil.mode == "RGBA":
+                        bg = Image.new("RGB", pil.size, (255, 255, 255))
+                        bg.paste(pil, mask=pil.split()[-1])
+                        pil = bg
+                    elif pil.mode not in ("RGB", "L"):
                         pil = pil.convert("RGB")
                     filename = f"p{page_no}_img{img_idx}.png"
                     pil.save(image_dir / filename, format="PNG")

@@ -27,11 +27,17 @@ STATIC_DIR = PACKAGE_DIR / "static"                     # 웹 UI 정적 파일
 
 
 def find_project_data_dir(start: Path | None = None) -> Path | None:
-    """현재 폴더부터 상위로 올라가며 `.pdfsearch/` 를 찾는다 (git 방식)."""
+    """현재 폴더부터 상위로 올라가며 `.pdfsearch/` 를 찾는다 (git 방식).
+
+    단순히 `.pdfsearch` 디렉터리가 존재하는지만 보면, 홈 폴더 아래
+    (전역 모델 캐시 등으로 인해 생성된) `.pdfsearch` 를 프로젝트로 오인할 수
+    있으므로, 실제로 `init` 된 프로젝트임을 나타내는 `db.sqlite` 존재 여부까지
+    확인한다.
+    """
     cur = (start or Path.cwd()).resolve()
     for candidate in [cur, *cur.parents]:
         d = candidate / DATA_DIR_NAME
-        if d.is_dir():
+        if d.is_dir() and (d / "db.sqlite").exists():
             return d
     return None
 
@@ -80,6 +86,12 @@ MODELS_DIR = _resolve_models_dir()
 # 모델 캐시 위치 고정 (임포트 시점에 환경변수 설정)
 os.environ.setdefault("HF_HOME", str(MODELS_DIR))
 os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", str(MODELS_DIR))
+
+# 번들 tessdata (Program Files 쓰기 권한 없이도 한국어 OCR 가능하도록).
+# 사용자가 이미 TESSDATA_PREFIX를 설정했다면 그대로 존중 (setdefault).
+_TESSDATA_DIR = REPO_DIR / "tessdata"
+if (_TESSDATA_DIR / "eng.traineddata").exists():
+    os.environ.setdefault("TESSDATA_PREFIX", str(_TESSDATA_DIR))
 
 # 필요한 디렉터리 자동 생성
 for _dir in (DATA_DIR, PDF_DIR, IMAGE_DIR, INBOX_DIR):

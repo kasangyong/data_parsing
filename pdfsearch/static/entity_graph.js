@@ -65,11 +65,14 @@ class EntityGraph {
     this.running = false;
 
     // 물리 파라미터 (엔티티는 노드 수가 많을 수 있어 반발력을 약간 낮춤)
+    // 연결선 없는 고립 노드가 많을 때도(관계보다 노드가 훨씬 많음) 빠르게
+    // 자리를 잡도록 마찰(damping)을 키우고 프레임당 이동량을 더 낮게 제한한다.
     this.repulsion = 16000;
     this.springLength = 130;
     this.springK = 0.04;
-    this.damping = 0.85;
+    this.damping = 0.72;
     this.centerPull = 0.014;
+    this.maxStep = 8;
 
     this._bindEvents();
   }
@@ -127,6 +130,9 @@ class EntityGraph {
   _physics() {
     const W = this.canvas.clientWidth, H = this.canvas.clientHeight;
     const nodes = this.nodes;
+    // 노드가 많을수록(엔티티 그래프는 연결 안 된 노드가 많을 수 있음) 반발력을
+    // 낮춰서 서로 계속 튕겨내며 흔들리는 현상을 줄인다.
+    const repulsion = this.repulsion / Math.max(1, Math.sqrt(nodes.length / 40));
 
     for (let i = 0; i < nodes.length; i++) {
       for (let j = i + 1; j < nodes.length; j++) {
@@ -134,7 +140,7 @@ class EntityGraph {
         let dx = a.x - b.x, dy = a.y - b.y;
         let d2 = dx * dx + dy * dy;
         if (d2 < 1) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1; }
-        const f = this.repulsion / d2;
+        const f = repulsion / d2;
         const d = Math.sqrt(d2);
         const fx = (dx / d) * f, fy = (dy / d) * f;
         a.vx += fx; a.vy += fy;
@@ -159,8 +165,8 @@ class EntityGraph {
       if (n === this.dragNode) { n.vx = 0; n.vy = 0; continue; }
       n.vx *= this.damping;
       n.vy *= this.damping;
-      n.x += Math.max(-14, Math.min(14, n.vx));
-      n.y += Math.max(-14, Math.min(14, n.vy));
+      n.x += Math.max(-this.maxStep, Math.min(this.maxStep, n.vx));
+      n.y += Math.max(-this.maxStep, Math.min(this.maxStep, n.vy));
       n.x = Math.max(n.radius + 4, Math.min(W - n.radius - 4, n.x));
       n.y = Math.max(n.radius + 4, Math.min(H - n.radius - 4, n.y));
     }

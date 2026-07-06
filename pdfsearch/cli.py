@@ -41,7 +41,8 @@ DATA_DIR_NAME = ".pdfsearch"
 def _find_project_root(start: Path | None = None) -> Path | None:
     cur = (start or Path.cwd()).resolve()
     for candidate in [cur, *cur.parents]:
-        if (candidate / DATA_DIR_NAME).is_dir():
+        data_dir = candidate / DATA_DIR_NAME
+        if data_dir.is_dir() and (data_dir / "db.sqlite").exists():
             return candidate
     return None
 
@@ -295,7 +296,7 @@ def cmd_status(args) -> int:
         print("프로젝트: 없음 (pdfsearch init 으로 생성하세요)")
     else:
         _require_project()
-        from .config import DATA_DIR, MODELS_DIR
+        from .config import DATA_DIR, MODELS_DIR, REPO_DIR
         from .database import init_db, list_documents
         from .embeddings import models_ready
         from .parser import is_ocr_available
@@ -305,6 +306,12 @@ def cmd_status(args) -> int:
         print(f"모델 캐시(전역): {MODELS_DIR}")
         print(f"모델 준비: {'예' if status['all_ready'] else '아니오 — pdfsearch models 실행 필요'}")
         print(f"OCR 가능: {'예' if is_ocr_available() else '아니오 (Tesseract 미설치 — 스캔본 PDF만 영향)'}")
+        tessdata = os.environ.get("TESSDATA_PREFIX")
+        if tessdata:
+            source = "번들" if tessdata == str(REPO_DIR / "tessdata") else "외부 설정"
+            print(f"TESSDATA_PREFIX: {tessdata} ({source})")
+        else:
+            print("TESSDATA_PREFIX: 미설정 (Tesseract 기본 설치 경로 사용)")
         print(f"문서 수: {len(list_documents())}")
     return 0
 
